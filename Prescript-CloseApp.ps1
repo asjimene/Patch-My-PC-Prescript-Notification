@@ -39,6 +39,45 @@ if (!(Test-Path -Path "$RegPath\$AppId")) {
     $null = New-Item -Path "$RegPath\$AppId" -Force
     $null = New-ItemProperty -Path "$RegPath\$AppId" -Name 'ShowInActionCenter' -Value 1 -PropertyType 'DWORD'
 }
+
+
+# Set the button actions in registry
+# Reg2CI (c) 2020 by Roger Zander
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdateclose") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdateclose" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdateclose\DefaultIcon") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdateclose\DefaultIcon" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdateclose\shell") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdateclose\shell" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdateclose\shell\open") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdateclose\shell\open" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdateclose\shell\open\command") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdateclose\shell\open\command" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdatecancel") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdatecancel" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdatecancel\DefaultIcon") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdatecancel\DefaultIcon" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdatecancel\shell") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdatecancel\shell" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdatecancel\shell\open") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdatecancel\shell\open" -Force -ea SilentlyContinue 
+};
+if ((Test-Path -LiteralPath "HKCU:\SOFTWARE\Classes\appupdatecancel\shell\open\command") -ne $true) {
+    New-Item "HKCU:\SOFTWARE\Classes\appupdatecancel\shell\open\command" -Force -ea SilentlyContinue 
+};
+New-ItemProperty -LiteralPath 'HKCU:\SOFTWARE\Classes\appupdateclose' -Name 'URL Protocol' -Value '' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath 'HKCU:\SOFTWARE\Classes\appupdateclose\shell\open\command' -Name '(default)' -Value 'C:\ProgramData\PMPC\AppUpdateClose.cmd' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath 'HKCU:\SOFTWARE\Classes\appupdatecancel' -Name 'URL Protocol' -Value '' -PropertyType String -Force -ea SilentlyContinue;
+New-ItemProperty -LiteralPath 'HKCU:\SOFTWARE\Classes\appupdatecancel\shell\open\command' -Name '(default)' -Value 'C:\ProgramData\PMPC\CancelUpdate.cmd' -PropertyType String -Force -ea SilentlyContinue;
+
 $HeaderFormat="ImageOnly"
 # Change up the headers as required
 If ($HeaderFormat -eq "TitleOnly") {
@@ -83,8 +122,8 @@ $ToastXml.LoadXml($ToastTemplate.OuterXml)
     </binding>
     </visual>
     <actions>
-      <action content="Close and Update" activationType="protocol" arguments="$SoftwarecenterShortcut" />
-      <action content="Cancel" arguments="" />
+      <action content="Close and Update" activationType="protocol" arguments="appupdateclose:" />
+      <action content="Ignore" activationType="protocol" arguments="appupdatecancel:" />
     </actions>
     <audio src="$AudioSource"/>
 </toast>
@@ -97,6 +136,25 @@ powershell.exe -ExecutionPolicy Bypass -file "C:\ProgramData\PMPC\Update-ToastNo
 $Hiddenvbs = @'
 CreateObject("Wscript.Shell").Run """" & WScript.Arguments(0) & """", 0, False
 '@
+
+$appupdateclose = @"
+powershell.exe -ExecutionPolicy Bypass -NoLogo -NonInteractive -NoProfile -WindowStyle Hidden -File "$env:ProgramData\PMPC\AppUpdateClosePS.ps1"
+"@
+
+$procstring = ("`"$($processes -join '","')`"").Replace('""','"')
+$appupdatecloseps = @"
+`$Processes =  $procstring
+`$Processes | ForEach-Object { Get-Process | Where-Object Path -Like "*`$_" | Stop-Process -Force}
+New-Item -ItemType File -Path "$env:ProgramData\PMPC\ButtonClicked" -force
+"@
+
+$CancelUpdate = @"
+powershell.exe -ExecutionPolicy Bypass -NoLogo -NonInteractive -NoProfile -WindowStyle Hidden -File "$env:ProgramData\PMPC\CancelUpdatePS.ps1"
+"@
+
+$CancelUpdateps = @"
+New-Item -ItemType File -Path "$env:ProgramData\PMPC\ButtonClicked" -force
+"@
 
 ###########################################################
 # MAIN
@@ -127,16 +185,29 @@ $ToastNotificationScript | Out-File -FilePath "$env:Programdata\PMPC\Update-Toas
 $ToastTemplate.InnerXml | Out-File -FilePath "$env:Programdata\PMPC\ToastTemplate.xml" -Encoding oem -Force
 $Hiddenvbs | Out-File -FilePath "$env:Programdata\PMPC\Hidden.vbs" -Encoding oem -Force
 $RunToastHidden | Out-File -FilePath "$env:ProgramData\PMPC\RunToastHidden.cmd" -Encoding oem -Force
+$appupdateclose | Out-File -FilePath "$env:ProgramData\PMPC\AppUpdateClose.cmd" -Encoding oem -Force
+$CancelUpdate | Out-File -FilePath "$env:ProgramData\PMPC\CancelUpdate.cmd" -Encoding oem -Force
+$appupdatecloseps | Out-File -FilePath "$env:ProgramData\PMPC\AppUpdateClosePS.ps1" -Encoding oem -Force
+$CancelUpdateps | Out-File -FilePath "$env:ProgramData\PMPC\CancelUpdatePS.ps1" -Encoding oem -Force
+Start-Process icacls -ArgumentList "$env:ProgramData\PMPC", "/grant Everyone:(OI)(CI)F"
+
+
+
+
+# Ensure the button press flag is gone
+Remove-Item "$env:ProgramData\PMPC\ButtonClicked" -ErrorAction SilentlyContinue -Force
 
 # Determine if the Toast Notification needs to be triggered
 $ProcessRunning = $Processes | ForEach-Object { Get-Process | Where-Object Path -Like "*$_" }
 if (-not [System.String]::IsNullOrEmpty($ProcessRunning)) {
 	# Trigger the notification
 	Start-ScheduledTask -TaskName $TaskName
-	for ($timer = 0; ($timer -lt $Timeout) -and (-not [System.String]::IsNullOrEmpty($ProcessRunning)); $timer++) {
+	for ($timer = 0; ($timer -lt $Timeout) -and (-not [System.String]::IsNullOrEmpty($ProcessRunning)) -and (-not (Test-Path "$env:ProgramData\PMPC\ButtonClicked" -ErrorAction SilentlyContinue)); $timer++) {
 		$ProcessRunning = $Processes | ForEach-Object { Get-Process | Where-Object Path -Like "*$_" }
 		Write-Host "waiting for processes to close - $ProcessRunning - $timer/$Timeout"
-		Start-Sleep -Milliseconds 800
+		Start-Sleep -Milliseconds 700
 	}
 }
 
+#Clear the button flag
+Remove-Item "$env:ProgramData\PMPC\ButtonClicked" -ErrorAction SilentlyContinue -Force
