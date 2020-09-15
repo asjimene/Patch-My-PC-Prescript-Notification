@@ -17,3 +17,10 @@
 8. Click "Browse" for the "Pre-Update Script", and navigate to the appropriate script that was generated for this app.
  ![Prescript Page Image](https://raw.githubusercontent.com/asjimene/Patch-My-PC-Prescript-Notification/master/Images/PrescriptPage.png)
 9. Repeat steps 4 through 8 for all desired products
+
+
+## Special Thanks
+
+* @SysBehr https://twitter.com/SysBehr
+* Trevor Jones https://smsagent.blog/2018/06/15/using-windows-10-toast-notifications-with-configmgr-application-deployments/
+* Roger Zander https://reg2ps.azurewebsites.net/

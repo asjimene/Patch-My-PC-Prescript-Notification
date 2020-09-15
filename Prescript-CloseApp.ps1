@@ -1,3 +1,5 @@
+## Patch My PC Notification Prescript
+
 $TaskName = "Patch My PC Update Notification Task"
 $Timeout = %TIMEOUT%
 $Processes = "%PROCESSLIST%"
