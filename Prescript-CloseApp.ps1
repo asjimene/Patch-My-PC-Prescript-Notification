@@ -1,13 +1,13 @@
 $TaskName = "Patch My PC Update Notification Task"
-$Timeout = 30
-$Processes = "notepad++.exe"
-$AppName = "Notepad++"
+$Timeout = %TIMEOUT%
+$Processes = "%PROCESSLIST%"
+$AppName = "%APPNAME%"
 
 # Notification parameters
 $Title = "Patch My PC Software Update Notification"
 $AudioSource = "ms-winsoundevent:Notification.Default"
 $SubtitleText = "$AppName must be closed in order to complete an update"
-$BodyText = "Please save yout work and close $AppName to proceed with the update"
+$BodyText = "Please save your work and close $AppName to proceed with the update"
 
 ## Files to Copy to the local device
 $ToastNotificationScript = @'
@@ -208,6 +208,13 @@ if (-not [System.String]::IsNullOrEmpty($ProcessRunning)) {
 		Start-Sleep -Milliseconds 700
 	}
 }
+
+
+# Load some required namespaces
+$null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+$null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+$app =  '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::History.Clear($app)
 
 #Clear the button flag
 Remove-Item "$env:ProgramData\PMPC\ButtonClicked" -ErrorAction SilentlyContinue -Force
