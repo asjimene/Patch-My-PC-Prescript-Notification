@@ -4,12 +4,37 @@ $TaskName = "Patch My PC Update Notification Task"
 $Timeout = %TIMEOUT%
 $Processes = "%PROCESSLIST%"
 $AppName = "%APPNAME%"
+$MaxIgnoreCount = %MAXNUMBEROFIGNORES%
 
 # Notification parameters
 $Title = "Patch My PC Software Update Notification"
 $AudioSource = "ms-winsoundevent:Notification.Default"
 $SubtitleText = "$AppName must be closed in order to complete an update"
 $BodyText = "Please save your work and close $AppName to proceed with the update"
+
+# Set up the ignore count
+$RegPath = "HKLM:\SOFTWARE\UpdateToast"
+$RegSz = "$AppName-$((Get-Item "$PSScriptRoot\*" | Where-Object {$_.FullName -like "*.exe" -or $_.FullName -like "*.msi"} | Select-Object -First 1).Length)"
+
+if (-not (Test-Path $RegPath -ErrorAction SilentlyContinue)){
+    New-Item $RegPath -Force -ErrorAction SilentlyContinue
+}
+
+$CurrentIgnoreCount = Get-ItemPropertyValue -Path $RegPath -Name $RegSz
+$CurrentIgnoreCount
+if ([System.String]::IsNullOrEmpty($CurrentIgnoreCount)){
+    New-ItemProperty -Path $RegPath -Name $RegSz -PropertyType String -Value "0" -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $RegPath -Name $RegSz -Value 0
+    $CurrentIgnoreCount = 0
+}
+
+If ([int]$CurrentIgnoreCount -ge $MaxIgnoreCount) {
+    $CloseAppVariable = $true
+} else {
+    $CloseAppVariable = $false
+    $IgnoresRemaining = $MaxIgnoreCount - $CurrentIgnoreCount
+    $SubtitleText += "`r`n`r`nThis update can be ignored $IgnoresRemaining more times."
+}
 
 ## Files to Copy to the local device
 $ToastNotificationScript = @'
@@ -125,7 +150,7 @@ $ToastXml.LoadXml($ToastTemplate.OuterXml)
     </visual>
     <actions>
       <action content="Close and Update" activationType="protocol" arguments="appupdateclose:" />
-      <action content="Ignore" activationType="protocol" arguments="appupdatecancel:" />
+      <!--<action content="Ignore" activationType="protocol" arguments="appupdatecancel:" />-->
     </actions>
     <audio src="$AudioSource"/>
 </toast>
@@ -181,10 +206,16 @@ $action.Arguments = "`"$env:ProgramData\PMPC\Hidden.vbs`" `"$env:ProgramData\PMP
 $taskFolder = $SchedService.GetFolder("\")
 $taskFolder.RegisterTaskDefinition("$TaskName", $Task , 6, 'BUILTIN\Users', $null, 4) 
 
+if ($CloseAppVariable) {
+    $NewToastTemplate = $ToastTemplate.InnerXml
+} else {
+    $NewToastTemplate = $ToastTemplate.InnerXml.Replace("<!--","").Replace("-->","")
+}
+
 # Copy the script files
 New-Item -ItemType Directory -Path "$env:ProgramData\PMPC" -Force -ErrorAction SilentlyContinue
-$ToastNotificationScript | Out-File -FilePath "$env:Programdata\PMPC\Update-ToastNotification.ps1" -Encoding oem -Force
-$ToastTemplate.InnerXml | Out-File -FilePath "$env:Programdata\PMPC\ToastTemplate.xml" -Encoding oem -Force
+$ToastNotificationScript.Replace("%CloseAppVariable%", "$CloseAppVariable") | Out-File -FilePath "$env:Programdata\PMPC\Update-ToastNotification.ps1" -Encoding oem -Force
+$NewToastTemplate | Out-File -FilePath "$env:Programdata\PMPC\ToastTemplate.xml" -Encoding oem -Force
 $Hiddenvbs | Out-File -FilePath "$env:Programdata\PMPC\Hidden.vbs" -Encoding oem -Force
 $RunToastHidden | Out-File -FilePath "$env:ProgramData\PMPC\RunToastHidden.cmd" -Encoding oem -Force
 $appupdateclose | Out-File -FilePath "$env:ProgramData\PMPC\AppUpdateClose.cmd" -Encoding oem -Force
@@ -220,3 +251,18 @@ $app =  '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershel
 
 #Clear the button flag
 Remove-Item "$env:ProgramData\PMPC\ButtonClicked" -ErrorAction SilentlyContinue -Force
+
+# If we hit our max number of ignores, just close the running apps and do the thing
+if ($CloseAppVariable) {
+    & C:\ProgramData\PMPC\AppUpdateClose.cmd
+}
+
+# Check if the Processes are still running, if so, this counts as an ignore
+$ProcessRunning = $Processes | ForEach-Object { Get-Process | Where-Object Path -Like "*$_" }
+if (-not [System.String]::IsNullOrEmpty($ProcessRunning)) {
+    $CurrentIgnoreCount
+    [int]$CurrentIgnoreCount + 1
+    Set-ItemProperty -Path $RegPath -Name $RegSz -Value $([int]($CurrentIgnoreCount)+1) -Force
+} else {
+    Remove-ItemProperty -Path $RegPath -Name $RegSz -Force
+}
