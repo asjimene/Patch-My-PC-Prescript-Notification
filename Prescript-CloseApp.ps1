@@ -204,7 +204,7 @@ $action.Path = 'wscript.exe'
 $action.Arguments = "`"$env:ProgramData\PMPC\Hidden.vbs`" `"$env:ProgramData\PMPC\RunToastHidden.cmd`""
 
 $taskFolder = $SchedService.GetFolder("\")
-$taskFolder.RegisterTaskDefinition("$TaskName", $Task , 6, 'BUILTIN\Users', $null, 4) 
+$taskFolder.RegisterTaskDefinition("$TaskName", $Task , 6, 'S-1-5-32-545', $null, 4) 
 
 if ($CloseAppVariable) {
     $NewToastTemplate = $ToastTemplate.InnerXml
